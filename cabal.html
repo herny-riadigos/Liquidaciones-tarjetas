@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cabal - Liquidaciones</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header class="header-top">
+        <h1 class="logo-title">Riadigos*</h1>
+    </header>
+
+    <main class="main-container">
+
+        <h2 class="main-title">Liquidación Cabal</h2>
+
+        <div class="cabal-layout">
+
+            <!-- 🟦 LADO IZQUIERDO – Pegado manual -->
+            <div class="paste-area">
+                <label for="textoCabal">Pegá aquí la liquidación:</label>
+                <textarea id="textoCabal" placeholder="Pegá la liquidación Cabal acá..."></textarea>
+
+                <button id="btnProcesar" class="btn-accion">Procesar Liquidación</button>
+            </div>
+
+            <!-- 🟩 LADO DERECHO – Lista de liquidaciones procesadas -->
+            <div class="lista-area">
+                <h3>Liquidaciones procesadas</h3>
+                <ul id="listaProcesadas"></ul>
+
+                <button id="btnTotalizador" class="btn-totalizador">
+                    Armar totalizador
+                </button>
+            </div>
+
+        </div>
+
+        <a href="index.html" class="btn-volver">⬅ Volver al menú</a>
+
+    </main>
+
+    <!-- JS -->
+
+    <script src="js/xlsx.full.min.js"></script>
+    <script src="js/utilidades.js"></script>
+    <script src="js/cabal.js"></script>
+
+    <textarea id="textoTest" style="width:100%; height:150px;"></textarea>
+    <br><br>
+    <button onclick="testEncabezado()">TEST ENCABEZADO</button>
+    <pre id="salidaTest" style="background:#111; color:#0f0; padding:15px;"></pre>
+
+    <script src="js/cabal_test.js"></script>
+
+
+</body>
+
+</html>

@@ -1,0 +1,223 @@
+/* ================================
+   PALETA RIADIGOS
+================================ */
+:root {
+  --verde-riadigos: #1b7f5f;
+  --azul-oscuro: #1d3557;
+  --pastel-fondo: #e6f4f1;
+  --pastel-hover: #d0ebe6;
+  --boton-fondo: #ffffff;
+  --boton-borde: #1d3557;
+}
+
+/* ================================
+   RESETEO BÁSICO
+================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+
+body {
+  background: var(--pastel-fondo);
+  min-height: 100vh;
+}
+
+
+/* ================================
+   TÍTULO SUPERIOR DERECHO
+================================ */
+.header-top {
+  width: 100%;
+  padding: 20px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.logo-title {
+  font-family: "Georgia", serif;
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--verde-riadigos);
+  letter-spacing: 1px;
+}
+
+
+/* ================================
+   TÍTULO CENTRAL
+================================ */
+.main-container {
+  text-align: center;
+  margin-top: 60px;
+}
+
+.main-title {
+  font-family: "Georgia", serif;
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--azul-oscuro);
+  margin-bottom: 50px;
+}
+
+
+/* ================================
+   BOTONERA PRINCIPAL
+================================ */
+.button-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 300px;
+  margin: auto;
+}
+
+.menu-btn {
+  display: block;
+  padding: 15px 20px;
+  background: var(--boton-fondo);
+  border: 2px solid var(--boton-borde);
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--boton-borde);
+  text-decoration: none;
+  text-align: center;
+  transition: 0.25s;
+}
+
+.menu-btn:hover {
+  background: var(--pastel-hover);
+  transform: scale(1.03);
+}
+
+/* ================================
+   TARJETA DE CONTENIDO
+================================ */
+.content-card {
+  background: white;
+  width: 70%;
+  margin: 0 auto 40px auto;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  text-align: center;
+  font-size: 18px;
+  color: #333;
+}
+
+/* ================================
+   BOTÓN VOLVER
+================================ */
+.btn-volver {
+  display: inline-block;
+  padding: 12px 20px;
+  background: var(--verde-riadigos);
+  color: white;
+  text-decoration: none;
+  font-size: 18px;
+  border-radius: 10px;
+  transition: 0.25s;
+}
+
+.btn-volver:hover {
+  background: #146047;
+  transform: scale(1.03);
+}
+
+/* ================================
+   LAYOUT DE CABAL
+================================ */
+.cabal-layout {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-top: 40px;
+}
+
+/* === Zona de pegado === */
+.paste-area {
+  width: 500px;
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.paste-area label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 10px;
+}
+
+#textoCabal {
+  width: 100%;
+  height: 250px;
+  resize: vertical;
+  padding: 10px;
+  font-size: 15px;
+}
+
+/* === Lista lateral === */
+.lista-area {
+  width: 280px;
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.lista-area h3 {
+  margin-bottom: 15px;
+}
+
+#listaProcesadas {
+  list-style: none;
+  padding-left: 0;
+}
+
+#listaProcesadas li {
+  padding: 8px 5px;
+  background: #f2f2f2;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* === Botón procesar === */
+.btn-accion {
+  margin-top: 15px;
+  padding: 12px 20px;
+  background: var(--verde-riadigos);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 10px;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+}
+
+.btn-accion:hover {
+  background: #146047;
+}
+
+/* === Botón totalizador === */
+.btn-totalizador {
+  margin-top: 25px;
+  padding: 12px 20px;
+  background: var(--azul-oscuro);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 10px;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+}
+
+.btn-totalizador:hover {
+  background: #0c223f;
+}
