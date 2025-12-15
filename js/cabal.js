@@ -61,7 +61,7 @@ function extraerReferencia(l) {
   if (m) {
     return m[1].replace(',', '.');
   }
-  
+
   const numeros = l.match(/\d+[.,]\d+/g);
   if (numeros && numeros.length >= 2) {
     return numeros[1].replace(',', '.');
@@ -742,7 +742,7 @@ function procesarLiquidacionCabal() {
     mostrarConfirmacion(datos.encabezado);
 
     // 8) Opcional: vaciar textarea
-    // textarea.value = "";
+    textarea.value = "";
 
   } catch (error) {
     console.error("Error procesando liquidación:", error);
