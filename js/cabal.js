@@ -1,44 +1,6 @@
 /* ============================================================
-   PARTE 1 - PARSER COMPLETO DE LIQUIDACIÓN CABAL
+   PARTE 1 - PARSER COMPLETO DE LIQUIDACIÓN CABAL - VERSIÓN CORREGIDA
    ============================================================ */
-
-/*
-  Este parser devuelve un objeto con esta estructura:
-
-  {
-    encabezado: {
-      fechaPago,
-      liquidacionNro,
-      cuenta
-    },
-
-    tit1: {
-      cuadro1: [...],
-      cuadro2: [...]
-    },
-
-    tit2: {
-      totalVentas: { cantidad, total },
-      cuadro: [...]
-    },
-
-    tit3: {
-      cuadro1: [...],
-      cuadro2: [...]
-    },
-
-    tit4: {
-      totalVentas: { cantidad, total },
-      cuadro: [...]
-    },
-
-    tit5: {
-      totFechaPago: { fecha, cantidad, total },
-      cuadro: [...],
-      totalFinal: importeFinal
-    }
-  }
-*/
 
 function parsearLiquidacionCabal(textoOriginal) {
   // 1) LIMPIEZA DE BASURA
@@ -62,61 +24,93 @@ function parsearLiquidacionCabal(textoOriginal) {
   };
 
   /* ============================================================
-     2) ENCABEZADO
+     2) ENCABEZADO - Versión mejorada para líneas combinadas
      ============================================================ */
 
-  lineas.forEach(l => {
-    if (l.startsWith("FECHA DE PAGO"))
-      datos.encabezado.fechaPago = l.split(":")[1].trim();
+  // Unir primeras líneas para buscar el encabezado
+  let textoEncabezado = lineas.slice(0, 3).join(" ");
+  
+  // Buscar FECHA DE PAGO con regex
+  const regexFecha = /FECHA\s+DE\s+PAGO\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i;
+  const matchFecha = textoEncabezado.match(regexFecha);
+  if (matchFecha) {
+    datos.encabezado.fechaPago = matchFecha[1];
+  }
 
-    if (l.startsWith("LIQUIDACION NRO"))
-      datos.encabezado.liquidacionNro = l.split(":")[1].trim();
+  // Buscar LIQUIDACION NRO
+  const regexLiquidacion = /LIQUIDACION\s+NRO\.?\s*:?\s*(\d+)/i;
+  const matchLiquidacion = textoEncabezado.match(regexLiquidacion);
+  if (matchLiquidacion) {
+    datos.encabezado.liquidacionNro = matchLiquidacion[1];
+  }
 
-    if (l.startsWith("CUENTA P/ACREDITAR"))
-      datos.encabezado.cuenta = l.split(":")[1].trim();
-  });
+  // Buscar CUENTA P/ACREDITAR VENTAS
+  const regexCuenta = /CUENTA\s+P\/ACREDITAR\s+VENTAS\s*:?\s*([^:]+?(?=\s*(?:ENCUADRES\s+FISCALES|$)))/i;
+  const matchCuenta = textoEncabezado.match(regexCuenta);
+  if (matchCuenta) {
+    datos.encabezado.cuenta = matchCuenta[1].trim();
+  }
+
+  // Si no encontró con regex, probar el método original línea por línea
+  if (!datos.encabezado.fechaPago || !datos.encabezado.liquidacionNro) {
+    lineas.forEach(l => {
+      if (l.toUpperCase().includes("FECHA DE PAGO")) {
+        datos.encabezado.fechaPago = extraerValorMejorado(l, "FECHA DE PAGO");
+      }
+      if (l.toUpperCase().includes("LIQUIDACION NRO")) {
+        datos.encabezado.liquidacionNro = extraerValorMejorado(l, "LIQUIDACION NRO");
+      }
+      if (l.toUpperCase().includes("CUENTA P/ACREDITAR VENTAS")) {
+        datos.encabezado.cuenta = extraerValorMejorado(l, "CUENTA P/ACREDITAR VENTAS");
+      }
+    });
+  }
 
   /* ============================================================
      3) TÍTULO 1 – VENTAS CORRESPONDIENTES A CABAL DEBITO
      ============================================================ */
-  const idxTit1 = lineas.indexOf("VENTAS CORRESPONDIENTES A CABAL DEBITO");
+  const idxTit1 = lineas.findIndex(l => 
+    l.toUpperCase().includes("VENTAS CORRESPONDIENTES A CABAL DEBITO")
+  );
+  
   if (idxTit1 !== -1) {
     for (let i = idxTit1 + 1; i < lineas.length; i++) {
       let l = lineas[i];
 
-      if (l.startsWith("08/") || /^\d{2}\/\d{2}\/\d{4}/.test(l)) {
-        if (l.includes("*TOTAL*")) {
-          // CUADRO 2
-          const p = l.split(" ");
-          datos.tit1.cuadro2.push({
-            fecha: p[0],
-            lote: p[1],
-            terminal: p[2],
-            cantidad: p[3],
-            total: limpiarImporte(p[p.length - 1])
-          });
-        } else if (l.startsWith("CABAL DEBITO TOTAL")) {
-          break;
-        } else {
-          // CUADRO 1
-          const p = l.split(" ");
-          const fecha = p[0];
-          const nroCupon = p[1];
-          const nroTarjeta = p[2];
-          const cuota = p[3];
-          const importe = limpiarImporte(p[4]);
-
-          datos.tit1.cuadro1.push({
-            fecha,
-            nroCupon,
-            nroTarjeta,
-            cuota,
-            importe
-          });
-        }
+      // Detener si encontramos el siguiente título
+      if (l.toUpperCase().includes("CABAL DEBITO TOTAL") ||
+          l.toUpperCase().includes("VENTAS CORRESPONDIENTES A TARJETA DE CREDITO")) {
+        break;
       }
 
-      if (l.startsWith("CABAL DEBITO TOTAL")) break;
+      // Procesar líneas con formato de fecha
+      if (l.startsWith("08/") || /^\d{2}\/\d{2}\/\d{4}/.test(l)) {
+        if (l.includes("*TOTAL*")) {
+          // CUADRO 2 (Total por terminal)
+          const partes = l.split(" ").filter(p => p !== "");
+          if (partes.length >= 5) {
+            datos.tit1.cuadro2.push({
+              fecha: partes[0],
+              lote: partes[1],
+              terminal: partes[2],
+              cantidad: partes[3],
+              total: limpiarImporte(partes[partes.length - 1])
+            });
+          }
+        } else {
+          // CUADRO 1 (Detalle de ventas)
+          const partes = l.split(" ").filter(p => p !== "");
+          if (partes.length >= 5) {
+            datos.tit1.cuadro1.push({
+              fecha: partes[0],
+              nroCupon: partes[1],
+              nroTarjeta: partes[2],
+              cuota: partes[3],
+              importe: limpiarImporte(partes[4])
+            });
+          }
+        }
+      }
     }
   }
 
@@ -124,36 +118,39 @@ function parsearLiquidacionCabal(textoOriginal) {
      4) TÍTULO 2 – CABAL DEBITO (totales + cuadro)
      ============================================================ */
   lineas.forEach(l => {
-    if (l.startsWith("CABAL DEBITO TOTAL DE VENTAS")) {
-      const parts = l.split(" ");
-      const cantidad = parseInt(parts[parts.length - 2]);
-      const total = limpiarImporte(parts[parts.length - 1]);
-
+    if (l.toUpperCase().startsWith("CABAL DEBITO TOTAL DE VENTAS")) {
+      const partes = l.split(" ").filter(p => p !== "");
+      const cantidad = parseInt(partes[partes.length - 2]) || 0;
+      const total = limpiarImporte(partes[partes.length - 1]);
       datos.tit2.totalVentas = { cantidad, total };
     }
 
-    if (l.startsWith("ARANCEL DE DESCUENTO") &&
-        !l.includes("TARJETA DE CREDITO")) {
-      const parts = l.split(" ");
-      const importe = limpiarImporte(parts.pop());
+    if (l.toUpperCase().includes("ARANCEL DE DESCUENTO") &&
+        l.toUpperCase().includes("CABAL") &&
+        !l.toUpperCase().includes("CREDITO")) {
+      const partes = l.split(" ").filter(p => p !== "");
+      const importe = limpiarImporte(partes[partes.length - 1]);
       const porc = extraerPorcentaje(l);
       const ref = extraerReferencia(l);
 
       datos.tit2.cuadro.push({
-        concepto: "ARANCEL DE DESCUENTO",
+        concepto: "ARANCEL DE DESCUENTO (DÉBITO)",
         porc,
         referencia: ref,
         importe
       });
     }
 
-    if (l.startsWith("IVA S/ARANCEL DE DESCUENTO")) {
-      const importe = limpiarImporte(l.split(" ").pop());
+    if (l.toUpperCase().includes("IVA S/ARANCEL DE DESCUENTO") &&
+        l.toUpperCase().includes("CABAL") &&
+        !l.toUpperCase().includes("CREDITO")) {
+      const partes = l.split(" ").filter(p => p !== "");
+      const importe = limpiarImporte(partes[partes.length - 1]);
       const porc = extraerPorcentaje(l);
       const ref = extraerReferencia(l);
 
       datos.tit2.cuadro.push({
-        concepto: "IVA S/ARANCEL DE DESCUENTO",
+        concepto: "IVA S/ARANCEL DE DESCUENTO (DÉBITO)",
         porc,
         referencia: ref,
         importe
@@ -164,32 +161,39 @@ function parsearLiquidacionCabal(textoOriginal) {
   /* ============================================================
      5) TÍTULO 3 – VENTAS TARJETA DE CREDITO
      ============================================================ */
-  const idxTit3 = lineas.indexOf("VENTAS CORRESPONDIENTES A TARJETA DE CREDITO");
+  const idxTit3 = lineas.findIndex(l => 
+    l.toUpperCase().includes("VENTAS CORRESPONDIENTES A TARJETA DE CREDITO")
+  );
+  
   if (idxTit3 !== -1) {
     for (let i = idxTit3 + 1; i < lineas.length; i++) {
       let l = lineas[i];
 
-      if (l.startsWith("TARJETA DE CREDITO TOTAL")) break;
+      if (l.toUpperCase().includes("TARJETA DE CREDITO TOTAL")) break;
 
       if (/^\d{2}\/\d{2}\/\d{4}/.test(l)) {
         if (l.includes("*TOTAL*")) {
-          const p = l.split(" ");
-          datos.tit3.cuadro2.push({
-            fecha: p[0],
-            lote: p[1],
-            terminal: p[2],
-            cantidad: p[3],
-            total: limpiarImporte(p[p.length - 1])
-          });
+          const partes = l.split(" ").filter(p => p !== "");
+          if (partes.length >= 5) {
+            datos.tit3.cuadro2.push({
+              fecha: partes[0],
+              lote: partes[1],
+              terminal: partes[2],
+              cantidad: partes[3],
+              total: limpiarImporte(partes[partes.length - 1])
+            });
+          }
         } else {
-          const p = l.split(" ");
-          datos.tit3.cuadro1.push({
-            fecha: p[0],
-            nroCupon: p[1],
-            nroTarjeta: p[2],
-            cuota: p[3],
-            importe: limpiarImporte(p[4])
-          });
+          const partes = l.split(" ").filter(p => p !== "");
+          if (partes.length >= 5) {
+            datos.tit3.cuadro1.push({
+              fecha: partes[0],
+              nroCupon: partes[1],
+              nroTarjeta: partes[2],
+              cuota: partes[3],
+              importe: limpiarImporte(partes[4])
+            });
+          }
         }
       }
     }
@@ -200,35 +204,39 @@ function parsearLiquidacionCabal(textoOriginal) {
      ============================================================ */
 
   lineas.forEach(l => {
-    if (l.startsWith("TARJETA DE CREDITO TOTAL DE VENTAS")) {
-      const p = l.split(" ");
-      const cantidad = parseInt(p[p.length - 2]);
-      const total = limpiarImporte(p[p.length - 1]);
+    if (l.toUpperCase().startsWith("TARJETA DE CREDITO TOTAL DE VENTAS")) {
+      const partes = l.split(" ").filter(p => p !== "");
+      const cantidad = parseInt(partes[partes.length - 2]) || 0;
+      const total = limpiarImporte(partes[partes.length - 1]);
       datos.tit4.totalVentas = { cantidad, total };
     }
 
-    if (l.startsWith("ARANCEL DE DESCUENTO") &&
-        !l.includes("CABAL DEBITO") &&
-        !l.includes("TIT. FEC")) {
-      const parts = l.split(" ");
-      const importe = limpiarImporte(parts.pop());
+    if (l.toUpperCase().includes("ARANCEL DE DESCUENTO") &&
+        l.toUpperCase().includes("CREDITO") &&
+        !l.toUpperCase().includes("DEBITO")) {
+      const partes = l.split(" ").filter(p => p !== "");
+      const importe = limpiarImporte(partes[partes.length - 1]);
       const porc = extraerPorcentaje(l);
       const ref = extraerReferencia(l);
+      
       datos.tit4.cuadro.push({
-        concepto: "ARANCEL DE DESCUENTO",
+        concepto: "ARANCEL DE DESCUENTO (CRÉDITO)",
         porc,
         referencia: ref,
         importe
       });
     }
 
-    if (l.startsWith("IVA S/ARANCEL DE DESCUENTO") &&
-        !l.includes("CABAL DEBITO")) {
-      const importe = limpiarImporte(l.split(" ").pop());
+    if (l.toUpperCase().includes("IVA S/ARANCEL DE DESCUENTO") &&
+        l.toUpperCase().includes("CREDITO") &&
+        !l.toUpperCase().includes("DEBITO")) {
+      const partes = l.split(" ").filter(p => p !== "");
+      const importe = limpiarImporte(partes[partes.length - 1]);
       const porc = extraerPorcentaje(l);
       const ref = extraerReferencia(l);
+      
       datos.tit4.cuadro.push({
-        concepto: "IVA S/ARANCEL DE DESCUENTO",
+        concepto: "IVA S/ARANCEL DE DESCUENTO (CRÉDITO)",
         porc,
         referencia: ref,
         importe
@@ -237,52 +245,111 @@ function parsearLiquidacionCabal(textoOriginal) {
   });
 
   /* ============================================================
-     7) TÍTULO 5 – TOT FEC PAGO (final)
+     7) TÍTULO 5 – TOT FEC PAGO (FINAL) - VERSIÓN CORREGIDA
      ============================================================ */
-
-  lineas.forEach(l => {
-    if (l.startsWith("TOT. FEC. PAGO")) {
-      const parts = l.split(" ");
-
-      const fecha = parts[3];
-      const cantidad = parseInt(parts[parts.length - 2]);
-      const total = limpiarImporte(parts[parts.length - 1]);
-
-      datos.tit5.totFechaPago = { fecha, cantidad, total };
+  
+  // Buscar el inicio de la sección final (TOT. FEC. PAGO)
+  const inicioSeccionFinal = lineas.findIndex(l => 
+    l.toUpperCase().startsWith("TOT. FEC. PAGO")
+  );
+  
+  if (inicioSeccionFinal !== -1) {
+    // Procesar TOT. FEC. PAGO
+    const lineaTotFecPago = lineas[inicioSeccionFinal];
+    const partesTotFec = lineaTotFecPago.split(" ").filter(p => p !== "");
+    if (partesTotFec.length >= 6) {
+      datos.tit5.totFechaPago = {
+        fecha: partesTotFec[3],
+        cantidad: parseInt(partesTotFec[partesTotFec.length - 2]) || 0,
+        total: limpiarImporte(partesTotFec[partesTotFec.length - 1])
+      };
     }
-
-    const conceptosFinales = [
-      "ARANCEL DE DESCUENTO",
-      "IVA S/ARANCEL DE DESCUENTO",
-      "IVA S/ARANCEL + COSTO FINANCIERO",
-      "COSTO FINANCIERO",
-      "NETO A LIQUIDAR POR VENTAS",
-      "PERCEPCION DE IVA RG 333",
-      "PERCEPCION DE IIBB",
-      "RETENCION IIBB SIRTAC"
-    ];
-
-    for (const c of conceptosFinales) {
-      if (l.startsWith(c)) {
-        const partes = l.split(" ");
-
-        const importe = limpiarImporte(partes.pop());
-        const ref = extraerReferencia(l);
-        const porc = extraerPorcentaje(l);
-
+    
+    // Procesar desde TOT. FEC. PAGO hasta IMPORTE NETO FINAL
+    // Los conceptos finales comienzan después de TOT. FEC. PAGO
+    for (let i = inicioSeccionFinal + 1; i < lineas.length; i++) {
+      const l = lineas[i];
+      
+      // Detener cuando encontramos IMPORTE NETO FINAL
+      if (l.toUpperCase().includes("IMPORTE NETO FINAL")) {
+        // Extraer el importe neto final
+        const partes = l.split(" ").filter(p => p !== "");
+        datos.tit5.totalFinal = limpiarImporte(partes[partes.length - 1]);
+        break;
+      }
+      
+      // Procesar conceptos finales (solo los que están en esta sección)
+      if (l.includes("ARANCEL DE DESCUENTO") && 
+          !l.includes("IVA") && 
+          !l.includes("CABAL") && 
+          !l.includes("CREDITO")) {
+        // ARANCEL DE DESCUENTO (total general)
+        const importe = limpiarImporte(l.split(" ").pop());
         datos.tit5.cuadro.push({
-          concepto: c,
+          concepto: "ARANCEL DE DESCUENTO (TOTAL)",
+          porc: "",
+          referencia: "",
+          importe
+        });
+      }
+      
+      if (l.includes("IVA S/ARANCEL + COSTO FINANCIERO")) {
+        const importe = limpiarImporte(l.split(" ").pop());
+        datos.tit5.cuadro.push({
+          concepto: "IVA S/ARANCEL + COSTO FINANCIERO",
+          porc: "",
+          referencia: "",
+          importe
+        });
+      }
+      
+      if (l.includes("NETO A LIQUIDAR POR VENTAS")) {
+        const importe = limpiarImporte(l.split(" ").pop());
+        datos.tit5.cuadro.push({
+          concepto: "NETO A LIQUIDAR POR VENTAS",
+          porc: "",
+          referencia: "",
+          importe
+        });
+      }
+      
+      if (l.includes("PERCEPCION DE IVA RG 333")) {
+        const importe = limpiarImporte(l.split(" ").pop());
+        const porc = extraerPorcentaje(l);
+        const ref = extraerReferencia(l);
+        datos.tit5.cuadro.push({
+          concepto: "PERCEPCION DE IVA RG 333",
+          porc,
+          referencia: ref,
+          importe
+        });
+      }
+      
+      if (l.includes("PERCEPCION DE IIBB")) {
+        const importe = limpiarImporte(l.split(" ").pop());
+        const porc = extraerPorcentaje(l);
+        const ref = extraerReferencia(l);
+        datos.tit5.cuadro.push({
+          concepto: "PERCEPCION DE IIBB",
+          porc,
+          referencia: ref,
+          importe
+        });
+      }
+      
+      if (l.includes("RETENCION IIBB SIRTAC")) {
+        const importe = limpiarImporte(l.split(" ").pop());
+        const porc = extraerPorcentaje(l);
+        const ref = extraerReferencia(l);
+        datos.tit5.cuadro.push({
+          concepto: "RETENCION IIBB SIRTAC",
           porc,
           referencia: ref,
           importe
         });
       }
     }
-
-    if (l.startsWith("IMPORTE NETO FINAL")) {
-      datos.tit5.totalFinal = limpiarImporte(l.split(" ").pop());
-    }
-  });
+  }
 
   return datos;
 }
@@ -291,193 +358,293 @@ function parsearLiquidacionCabal(textoOriginal) {
    FUNCIONES AUXILIARES
    ============================================================ */
 
+function limpiarImporte(texto) {
+  if (!texto) return 0;
+  // Reemplazar comas por puntos y eliminar caracteres no numéricos
+  const limpio = texto.replace(/\./g, "").replace(/,/g, ".").replace(/[^\d.-]/g, "");
+  const numero = parseFloat(limpio);
+  return isNaN(numero) ? 0 : numero;
+}
+
 function extraerPorcentaje(l) {
   const m = l.match(/(\d+,\d+)%/);
-  return m ? m[1] : "";
+  return m ? m[1].replace(',', '.') : "";
 }
 
 function extraerReferencia(l) {
-  const m = l.match(/(\d+,\d+)\s+\d+,\d+−?$/);
-  return m ? m[1] : "";
+  // Busca el primer número con decimales (puede ser con coma o punto)
+  const m = l.match(/(\d+[.,]\d+)\s+\d+[.,]\d+/);
+  return m ? m[1].replace(',', '.') : "";
+}
+
+function extraerValorMejorado(linea, clave) {
+  // Busca la clave y extrae todo lo que viene después
+  const indice = linea.toUpperCase().indexOf(clave.toUpperCase());
+  if (indice === -1) return "";
+  
+  // Tomar la parte después de la clave
+  const parte = linea.substring(indice + clave.length);
+  // Buscar dos puntos y tomar lo que sigue
+  const indiceDosPuntos = parte.indexOf(":");
+  if (indiceDosPuntos !== -1) {
+    const valor = parte.substring(indiceDosPuntos + 1).trim();
+    // Limpiar si hay basura después
+    const indiceBasura = valor.toUpperCase().indexOf("ENCUADRES FISCALES");
+    if (indiceBasura !== -1) {
+      return valor.substring(0, indiceBasura).trim();
+    }
+    return valor;
+  }
+  return parte.trim();
 }
 
 /* ============================================================
-   PARTE 2 - GENERADOR DE EXCEL
+   PARTE 2 - GENERADOR DE EXCEL CON FORMATO DE MONEDA
    ============================================================ */
 
 function generarExcelCabal(datos, nombreArchivo) {
+  // Crear un nuevo libro de trabajo
   const wb = XLSX.utils.book_new();
+  
+  // Crearemos la hoja manualmente para controlar el formato
   const ws = {};
-
-  let fila = 1; // Va aumentando a medida que agregamos contenido
-
-  function setCell(col, row, value) {
-    const cell = col + row;
-    ws[cell] = { v: value };
-  }
-
-  function escribirFila(titulo, arrColumnas, arrDatos) {
-    // Título combinado
-    setCell("A", fila, titulo);
-    fila++;
-
-    // Encabezados
-    arrColumnas.forEach((col, idx) => {
-      setCell(String.fromCharCode(65 + idx), fila, col);
-    });
-    fila++;
-
-    // Datos
-    arrDatos.forEach(reg => {
-      let colIdx = 0;
-      for (let k in reg) {
-        setCell(String.fromCharCode(65 + colIdx), fila, reg[k]);
-        colIdx++;
+  
+  // Configuración de ancho de columnas
+  const wscols = [
+    { wch: 30 }, // Columna A
+    { wch: 10 }, // Columna B  
+    { wch: 15 }, // Columna C
+    { wch: 20 }, // Columna D
+    { wch: 20 }  // Columna E
+  ];
+  
+  // Función para agregar celda con formato
+  function agregarCelda(col, row, valor, esNumero = false, esMoneda = false) {
+    const celda = XLSX.utils.encode_cell({c: col, r: row});
+    
+    if (esNumero) {
+      // Convertir a número
+      const numValor = typeof valor === 'string' ? parseFloat(valor) : valor;
+      ws[celda] = { 
+        v: numValor,
+        t: 'n'
+      };
+      
+      if (esMoneda) {
+        // Formato de moneda argentina
+        ws[celda].z = '"$"#,##0.00;[Red]"$"#,##0.00';
+      } else {
+        // Formato numérico estándar
+        ws[celda].z = '#,##0.00';
       }
-      fila++;
-    });
-
-    // Separador visual
-    fila++;
+    } else {
+      // Texto normal
+      ws[celda] = { v: valor, t: 's' };
+    }
   }
-
-  /* ============================================================
-       BLOQUE ENCABEZADO
-     ============================================================ */
-  setCell("A", fila, "ENCABEZADO");
-  fila++;
-
-  setCell("A", fila, "FECHA DE PAGO");
-  setCell("B", fila, datos.encabezado.fechaPago);
-  fila++;
-
-  setCell("A", fila, "NRO LIQUIDACION");
-  setCell("B", fila, datos.encabezado.liquidacionNro);
-  fila++;
-
-  setCell("A", fila, "CUENTA");
-  setCell("B", fila, datos.encabezado.cuenta);
-  fila += 2; // separador
-
-  /* ============================================================
-       TÍTULO 1 – CABAL DÉBITO (CUADRO 1 + CUADRO 2)
-     ============================================================ */
-
-  // CUADRO 1
-  escribirFila(
-    "VENTAS CORRESPONDIENTES A CABAL DEBITO — CUADRO 1",
-    ["FECHA COMPRA", "NRO CUPON", "NRO TARJETA", "CUOTA", "IMPORTE TOTAL"],
-    datos.tit1.cuadro1
-  );
-
-  // CUADRO 2
-  escribirFila(
-    "VENTAS CORRESPONDIENTES A CABAL DEBITO — CUADRO 2",
-    ["FECHA COMPRA", "NRO LOTE", "NRO TERMINAL", "CANTIDAD CUPONES", "TOTAL"],
-    datos.tit1.cuadro2
-  );
-
-  /* ============================================================
-       TÍTULO 2 – CABAL DEBITO (TOTAL + CUADRO)
-     ============================================================ */
-
-  // Total de ventas
-  escribirFila(
-    "CABAL DEBITO — TOTAL DE VENTAS",
-    ["CANTIDAD", "TOTAL"],
-    [datos.tit2.totalVentas]
-  );
-
-  // Cuadro (arancel + iva)
-  escribirFila(
-    "CABAL DEBITO — CUADRO",
-    ["CONCEPTO", "%", "REFERENCIA", "IMPORTE TOTAL"],
-    datos.tit2.cuadro
-  );
-
-  /* ============================================================
-       TÍTULO 3 – TARJETA CRÉDITO (CUADRO 1 + 2)
-     ============================================================ */
-
-  escribirFila(
-    "VENTAS CORRESPONDIENTES A TARJETA DE CREDITO — CUADRO 1",
-    ["FECHA COMPRA", "NRO CUPON", "NRO TARJETA", "CUOTA", "IMPORTE TOTAL"],
-    datos.tit3.cuadro1
-  );
-
-  escribirFila(
-    "VENTAS CORRESPONDIENTES A TARJETA DE CREDITO — CUADRO 2",
-    ["FECHA COMPRA", "NRO LOTE", "NRO TERMINAL", "CANTIDAD CUPONES", "TOTAL"],
-    datos.tit3.cuadro2
-  );
-
-  /* ============================================================
-       TÍTULO 4 – TARJETA DE CRÉDITO (TOTAL + CUADRO)
-     ============================================================ */
-
-  escribirFila(
-    "TARJETA DE CREDITO — TOTAL DE VENTAS",
-    ["CANTIDAD", "TOTAL"],
-    [datos.tit4.totalVentas]
-  );
-
-  escribirFila(
-    "TARJETA DE CREDITO — CUADRO",
-    ["CONCEPTO", "%", "REFERENCIA", "IMPORTE TOTAL"],
-    datos.tit4.cuadro
-  );
-
-  /* ============================================================
-       TÍTULO 5 – TOT FEC PAGO
-     ============================================================ */
-
-  // Total fecha pago
-  escribirFila(
-    "TOT FEC PAGO — TOTAL",
-    ["FECHA", "CANTIDAD", "TOTAL"],
-    [datos.tit5.totFechaPago]
-  );
-
-  // Cuadro final (retenciones, percepciones, neto, arancel)
-  escribirFila(
-    "TOT FEC PAGO — CUADRO FINAL",
-    ["CONCEPTO", "%", "REFERENCIA", "IMPORTE TOTAL"],
-    datos.tit5.cuadro
-  );
-
-  // Total final (último renglón)
-  setCell("A", fila, "IMPORTE NETO FINAL");
-  setCell("B", fila, datos.tit5.totalFinal);
-
-  ws["!ref"] = `A1:Z${fila}`;
-  XLSX.utils.book_append_sheet(wb, ws, "LIQ CABAL");
-  XLSX.writeFile(wb, nombreArchivo + ".xlsx");
+  
+  // Función para agregar fila
+  function agregarFila(fila, valores) {
+    valores.forEach((valor, col) => {
+      // Determinar si es número
+      const esNumero = typeof valor === 'number';
+      const esMoneda = esNumero; // Todos los números serán moneda por ahora
+      agregarCelda(col, fila, valor, esNumero, esMoneda);
+    });
+  }
+  
+  let filaActual = 0;
+  
+  // ENCABEZADO
+  agregarFila(filaActual++, ["ENCABEZADO DE LIQUIDACIÓN"]);
+  agregarFila(filaActual++, ["FECHA DE PAGO:", datos.encabezado.fechaPago]);
+  agregarFila(filaActual++, ["NRO. LIQUIDACIÓN:", datos.encabezado.liquidacionNro]);
+  agregarFila(filaActual++, ["CUENTA:", datos.encabezado.cuenta]);
+  filaActual++; // Línea vacía
+  
+  // TÍTULO 1: VENTAS CABAL DÉBITO - CUADRO 1
+  if (datos.tit1.cuadro1.length > 0) {
+    agregarFila(filaActual++, ["VENTAS CORRESPONDIENTES A CABAL DÉBITO - DETALLE"]);
+    agregarFila(filaActual++, ["FECHA", "NRO CUPÓN", "NRO TARJETA", "CUOTA", "IMPORTE"]);
+    
+    datos.tit1.cuadro1.forEach(item => {
+      agregarFila(filaActual++, [
+        item.fecha,
+        item.nroCupon,
+        item.nroTarjeta,
+        item.cuota,
+        item.importe
+      ]);
+    });
+    filaActual++;
+  }
+  
+  // TÍTULO 1: VENTAS CABAL DÉBITO - CUADRO 2
+  if (datos.tit1.cuadro2.length > 0) {
+    agregarFila(filaActual++, ["VENTAS CORRESPONDIENTES A CABAL DÉBITO - TOTALES POR TERMINAL"]);
+    agregarFila(filaActual++, ["FECHA", "LOTE", "TERMINAL", "CANTIDAD", "TOTAL"]);
+    
+    datos.tit1.cuadro2.forEach(item => {
+      agregarFila(filaActual++, [
+        item.fecha,
+        item.lote,
+        item.terminal,
+        item.cantidad,
+        item.total
+      ]);
+    });
+    filaActual++;
+  }
+  
+  // TÍTULO 2: CABAL DÉBITO TOTALES
+  agregarFila(filaActual++, ["CABAL DÉBITO - RESUMEN"]);
+  agregarFila(filaActual++, ["TOTAL VENTAS:", `Cantidad: ${datos.tit2.totalVentas.cantidad || 0}`, `Importe:`, "", datos.tit2.totalVentas.total || 0]);
+  
+  if (datos.tit2.cuadro.length > 0) {
+    filaActual++;
+    agregarFila(filaActual++, ["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
+    
+    datos.tit2.cuadro.forEach(item => {
+      agregarFila(filaActual++, [
+        item.concepto,
+        item.porc,
+        item.referencia,
+        "",
+        item.importe
+      ]);
+    });
+  }
+  filaActual++;
+  
+  // TÍTULO 3: VENTAS TARJETA CRÉDITO - CUADRO 1
+  if (datos.tit3.cuadro1.length > 0) {
+    agregarFila(filaActual++, ["VENTAS TARJETA DE CRÉDITO - DETALLE"]);
+    agregarFila(filaActual++, ["FECHA", "NRO CUPÓN", "NRO TARJETA", "CUOTA", "IMPORTE"]);
+    
+    datos.tit3.cuadro1.forEach(item => {
+      agregarFila(filaActual++, [
+        item.fecha,
+        item.nroCupon,
+        item.nroTarjeta,
+        item.cuota,
+        item.importe
+      ]);
+    });
+    filaActual++;
+  }
+  
+  // TÍTULO 3: VENTAS TARJETA CRÉDITO - CUADRO 2
+  if (datos.tit3.cuadro2.length > 0) {
+    agregarFila(filaActual++, ["VENTAS TARJETA DE CRÉDITO - TOTALES POR TERMINAL"]);
+    agregarFila(filaActual++, ["FECHA", "LOTE", "TERMINAL", "CANTIDAD", "TOTAL"]);
+    
+    datos.tit3.cuadro2.forEach(item => {
+      agregarFila(filaActual++, [
+        item.fecha,
+        item.lote,
+        item.terminal,
+        item.cantidad,
+        item.total
+      ]);
+    });
+    filaActual++;
+  }
+  
+  // TÍTULO 4: TARJETA CRÉDITO TOTALES
+  agregarFila(filaActual++, ["TARJETA DE CRÉDITO - RESUMEN"]);
+  agregarFila(filaActual++, ["TOTAL VENTAS:", `Cantidad: ${datos.tit4.totalVentas.cantidad || 0}`, `Importe:`, "", datos.tit4.totalVentas.total || 0]);
+  
+  if (datos.tit4.cuadro.length > 0) {
+    filaActual++;
+    agregarFila(filaActual++, ["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
+    
+    datos.tit4.cuadro.forEach(item => {
+      agregarFila(filaActual++, [
+        item.concepto,
+        item.porc,
+        item.referencia,
+        "",
+        item.importe
+      ]);
+    });
+  }
+  filaActual++;
+  
+  // TÍTULO 5: TOT FEC PAGO
+  if (datos.tit5.totFechaPago.fecha) {
+    agregarFila(filaActual++, ["TOTAL FECHA DE PAGO"]);
+    agregarFila(filaActual++, ["FECHA:", datos.tit5.totFechaPago.fecha]);
+    agregarFila(filaActual++, ["CANTIDAD:", datos.tit5.totFechaPago.cantidad]);
+    agregarFila(filaActual++, ["TOTAL:", "", "", "", datos.tit5.totFechaPago.total]);
+    filaActual++;
+  }
+  
+  // TÍTULO 5: CUADRO FINAL (SOLO CONCEPTOS FINALES)
+  if (datos.tit5.cuadro.length > 0) {
+    agregarFila(filaActual++, ["CONCEPTOS FINALES"]);
+    agregarFila(filaActual++, ["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
+    
+    datos.tit5.cuadro.forEach(item => {
+      agregarFila(filaActual++, [
+        item.concepto,
+        item.porc,
+        item.referencia,
+        "",
+        item.importe
+      ]);
+    });
+    filaActual++;
+  }
+  
+  // IMPORTE NETO FINAL
+  if (datos.tit5.totalFinal) {
+    agregarFila(filaActual++, ["IMPORTE NETO FINAL A LIQUIDAR"]);
+    agregarFila(filaActual++, ["IMPORTE:", "", "", "", datos.tit5.totalFinal]);
+  }
+  
+  // Definir el rango de la hoja
+  const range = {s: {c: 0, r: 0}, e: {c: 4, r: filaActual}};
+  ws['!ref'] = XLSX.utils.encode_range(range);
+  ws['!cols'] = wscols;
+  
+  // Agregar la hoja al libro
+  XLSX.utils.book_append_sheet(wb, ws, "Liquidación");
+  
+  // Descargar el archivo
+  const nombreFinal = `${nombreArchivo || "liquidacion_cabal"}.xlsx`;
+  XLSX.writeFile(wb, nombreFinal);
+  
+  return nombreFinal;
 }
 
+
 /* ============================================================
-   PARTE 3 - INTEGRACIÓN ADAPTADA A TU cabal.html
+   PARTE 3 - INTEGRACIÓN CON LA INTERFAZ
    ============================================================ */
 
 let liquidacionesProcesadas = [];
 
 // Esperar que el HTML esté cargado
 document.addEventListener("DOMContentLoaded", () => {
-
   const btnProcesar = document.getElementById("btnProcesar");
   const btnTotalizador = document.getElementById("btnTotalizador");
+  const btnLimpiar = document.getElementById("btnLimpiar");
 
-  // Si no existen, mostrar error en consola
-  if (!btnProcesar) {
-    console.error("ERROR: No existe el botón #btnProcesar en el HTML");
-    return;
+  if (btnProcesar) {
+    btnProcesar.addEventListener("click", procesarLiquidacionCabal);
   }
-  if (!btnTotalizador) {
-    console.error("ERROR: No existe el botón #btnTotalizador en el HTML");
-    return;
+  
+  if (btnTotalizador) {
+    btnTotalizador.addEventListener("click", armarTotalizadorCabal);
   }
-
-  btnProcesar.addEventListener("click", procesarLiquidacionCabal);
-  btnTotalizador.addEventListener("click", armarTotalizadorCabal);
+  
+  if (btnLimpiar) {
+    btnLimpiar.addEventListener("click", () => {
+      document.getElementById("textoCabal").value = "";
+      document.getElementById("listaProcesadas").innerHTML = "";
+      liquidacionesProcesadas = [];
+    });
+  }
 });
 
 /* ============================================================
@@ -493,32 +660,92 @@ function procesarLiquidacionCabal() {
     return;
   }
 
-  // 1) Parseo
-  const datos = parsearLiquidacionCabal(texto);
-
-  // 2) Guardar internamente
-  liquidacionesProcesadas.push(datos);
-
-  // 3) Generar Excel individual
-  const nombreArchivo = `Liquidacion_${datos.encabezado.liquidacionNro}`;
-  generarExcelCabal(datos, nombreArchivo);
-
-  // 4) Agregar a la lista lateral
-  agregarALaListaCabal(nombreArchivo);
-
-  // 5) Vaciar textarea para pegar otra liq
-  textarea.value = "";
+  try {
+    // 1) Parsear los datos
+    const datos = parsearLiquidacionCabal(texto);
+    
+    console.log("Datos parseados:", datos); // Para depuración
+    
+    // 2) Verificar que se extrajo información
+    if (!datos.encabezado.fechaPago && !datos.encabezado.liquidacionNro) {
+      alert("No se pudo extraer información del encabezado. Verifica el formato.");
+      return;
+    }
+    
+    // 3) Guardar internamente
+    liquidacionesProcesadas.push(datos);
+    
+    // 4) Generar nombre de archivo
+    const numLiquidacion = datos.encabezado.liquidacionNro || "SIN_NUMERO";
+    const fecha = datos.encabezado.fechaPago ? datos.encabezado.fechaPago.replace(/\//g, "-") : "";
+    const nombreArchivo = `Liquidacion_CABAL_${numLiquidacion}_${fecha}`;
+    
+    // 5) Generar y descargar Excel
+    generarExcelCabal(datos, nombreArchivo);
+    
+    // 6) Agregar a la lista lateral
+    agregarALaListaCabal(nombreArchivo, datos.encabezado);
+    
+    // 7) Mostrar confirmación
+    mostrarConfirmacion(datos.encabezado);
+    
+    // 8) Opcional: vaciar textarea
+    // textarea.value = "";
+    
+  } catch (error) {
+    console.error("Error procesando liquidación:", error);
+    alert(`Error al procesar la liquidación: ${error.message}`);
+  }
 }
 
 /* ============================================================
    AGREGA A LA LISTA LATERAL
    ============================================================ */
 
-function agregarALaListaCabal(nombre) {
+function agregarALaListaCabal(nombreArchivo, encabezado) {
   const ul = document.getElementById("listaProcesadas");
+  if (!ul) return;
+  
   const li = document.createElement("li");
-  li.textContent = nombre;
+  li.className = "list-group-item d-flex justify-content-between align-items-center";
+  
+  const info = document.createElement("span");
+  info.textContent = `${encabezado.liquidacionNro || "Sin N°"} - ${encabezado.fechaPago || "Sin fecha"}`;
+  
+  const badge = document.createElement("span");
+  badge.className = "badge bg-success rounded-pill";
+  badge.textContent = "✓";
+  
+  li.appendChild(info);
+  li.appendChild(badge);
   ul.appendChild(li);
+}
+
+/* ============================================================
+   MUESTRA CONFIRMACIÓN
+   ============================================================ */
+
+function mostrarConfirmacion(encabezado) {
+  const confirmacion = document.createElement("div");
+  confirmacion.className = "alert alert-success alert-dismissible fade show mt-3";
+  confirmacion.innerHTML = `
+    <strong>✓ Liquidación procesada correctamente</strong>
+    <p>N° Liquidación: ${encabezado.liquidacionNro || "No identificado"}<br>
+       Fecha: ${encabezado.fechaPago || "No especificada"}<br>
+       <small>El archivo Excel se está descargando automáticamente.</small>
+    </p>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+  
+  const contenedor = document.querySelector(".container");
+  contenedor.appendChild(confirmacion);
+  
+  // Auto-eliminar después de 5 segundos
+  setTimeout(() => {
+    if (confirmacion.parentNode) {
+      confirmacion.remove();
+    }
+  }, 5000);
 }
 
 /* ============================================================
@@ -531,5 +758,48 @@ function armarTotalizadorCabal() {
     return;
   }
 
-  alert("El Totalizador se implementará luego. Ya tengo todos los datos preparados.");
+  // Crear un libro de trabajo para el totalizador
+  const wb = XLSX.utils.book_new();
+  const wsData = [];
+  
+  // Encabezado del totalizador
+  wsData.push(["TOTALIZADOR DE LIQUIDACIONES CABAL"]);
+  wsData.push([]);
+  wsData.push(["N° Liquidación", "Fecha Pago", "Cuenta", "Total Débito", "Total Crédito", "Neto Final"]);
+  
+  // Sumar los datos de todas las liquidaciones
+  let totalDebito = 0;
+  let totalCredito = 0;
+  let totalNeto = 0;
+  
+  liquidacionesProcesadas.forEach(liquidacion => {
+    const totalDebLiq = liquidacion.tit2.totalVentas.total || 0;
+    const totalCreLiq = liquidacion.tit4.totalVentas.total || 0;
+    const netoLiq = liquidacion.tit5.totalFinal || 0;
+    
+    wsData.push([
+      liquidacion.encabezado.liquidacionNro || "",
+      liquidacion.encabezado.fechaPago || "",
+      liquidacion.encabezado.cuenta || "",
+      totalDebLiq,
+      totalCreLiq,
+      netoLiq
+    ]);
+    
+    totalDebito += totalDebLiq;
+    totalCredito += totalCreLiq;
+    totalNeto += netoLiq;
+  });
+  
+  // Agregar totales
+  wsData.push([]);
+  wsData.push(["TOTALES", "", "", totalDebito, totalCredito, totalNeto]);
+  
+  // Crear la hoja
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb, ws, "Totalizador");
+  
+  // Descargar el archivo
+  const fecha = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `Totalizador_CABAL_${fecha}.xlsx`);
 }
