@@ -221,3 +221,14 @@ body {
 .btn-totalizador:hover {
   background: #0c223f;
 }
+
+/* Corrección para Nación */
+.content-card {
+    max-width: 600px;
+    margin: 0 auto;
+    display: block;
+}
+
+.content-card textarea {
+    width: 100%;
+}

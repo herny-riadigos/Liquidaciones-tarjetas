@@ -10,26 +10,29 @@
 
 <body>
 
-    <!-- TÍTULO SUPERIOR DERECHO -->
     <header class="header-top">
         <h1 class="logo-title">Riadigos*</h1>
     </header>
 
-    <!-- CONTENIDO CENTRAL -->
     <main class="main-container">
 
         <h2 class="main-title">Liquidación Banco Nación</h2>
 
         <div class="content-card">
-            <p>Acá se procesarán las liquidaciones del Banco Nación.</p>
+            <label>Pegá la liquidación completa:</label>
+            <textarea id="textoNacion" placeholder="Pegá acá la liquidación Nación..." rows="14"></textarea>
+
+            <button id="btnProcesarNacion" class="btn-accion">Procesar Liquidación</button>
         </div>
 
         <a href="index.html" class="btn-volver">⬅ Volver al menú</a>
 
     </main>
-    <script src="js/xlsx.full.min.js"></script>
+
+    <!-- librería Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="js/nacion.js"></script>
     <script src="js/utilidades.js"></script>
-    <script src="js/nacion.js"></script> <!-- o nacion.js -->
 
 </body>
 
