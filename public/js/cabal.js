@@ -806,54 +806,160 @@ function mostrarConfirmacion(encabezado) {
    BOTÓN "ARMAR TOTALIZADOR"
    ============================================================ */
 
+/* ============================================================
+   BOTÓN "ARMAR TOTALIZADOR" (REEMPLAZO COMPLETO)
+   ============================================================ */
 function armarTotalizadorCabal() {
   if (liquidacionesProcesadas.length === 0) {
     alert("Procesá al menos una liquidación primero.");
     return;
   }
 
-  // Crear un libro de trabajo para el totalizador
-  const wb = XLSX.utils.book_new();
-  const wsData = [];
+  // Helpers locales
+  const num = v => (typeof v === "number" && !isNaN(v)) ? v : 0;
+  const findConcept = (arr, startsWith) => {
+    if (!Array.isArray(arr)) return 0;
+    const hit = arr.find(x => (x.concepto || "").toUpperCase().startsWith(startsWith.toUpperCase()));
+    return hit ? num(hit.importe) : 0;
+  };
 
-  // Encabezado del totalizador
-  wsData.push(["TOTALIZADOR DE LIQUIDACIONES CABAL"]);
-  wsData.push([]);
-  wsData.push(["N° Liquidación", "Fecha Pago", "Cuenta", "Total Débito", "Total Crédito", "Neto Final"]);
+  // Encabezado de columnas del totalizador
+  const headers = [
+    "N° Liquidación",       // A
+    "Fecha Pago",           // B
+    "Cuenta",               // C
+    "Cant Débito",          // D
+    "Total Débito",         // E
+    "Arancel Débito",       // F
+    "IVA Débito",           // G
+    "Cant Crédito",         // H
+    "Total Crédito",        // I
+    "Arancel Crédito",      // J
+    "IVA Crédito",          // K
+    "TOTAL FECHA PAGO",     // L (importe de TOT. FEC. PAGO)
+    "Arancel Total",        // M (tit5)
+    "IVA + Costo Finan.",   // N (tit5)
+    "Neto a Liquidar",      // O (tit5)
+    "Percepción IIBB",      // P (tit5)
+    "Retención IIBB SIRTAC",// Q (tit5)
+    "Importe Neto Final"    // R (tit5.totalFinal)
+  ];
 
-  // Sumar los datos de todas las liquidaciones
-  let totalDebito = 0;
-  let totalCredito = 0;
-  let totalNeto = 0;
+  const data = [];
+  data.push(["TOTALIZADOR DE LIQUIDACIONES CABAL"]);
+  data.push([]);
+  data.push(headers);
 
-  liquidacionesProcesadas.forEach(liquidacion => {
-    const totalDebLiq = liquidacion.tit2.totalVentas.total || 0;
-    const totalCreLiq = liquidacion.tit4.totalVentas.total || 0;
-    const netoLiq = liquidacion.tit5.totalFinal || 0;
+  // Acumuladores globales por columna (desde D a R)
+  const totals = new Array(headers.length).fill(0);
 
-    wsData.push([
-      liquidacion.encabezado.liquidacionNro || "",
-      liquidacion.encabezado.fechaPago || "",
-      liquidacion.encabezado.cuenta || "",
-      totalDebLiq,
-      totalCreLiq,
-      netoLiq
-    ]);
+  liquidacionesProcesadas.forEach((liq) => {
+    // ------------------ Sección Débito (tit2) ------------------
+    const debCant = num(liq?.tit2?.totalVentas?.cantidad);
+    const debTotal = num(liq?.tit2?.totalVentas?.total);
 
-    totalDebito += totalDebLiq;
-    totalCredito += totalCreLiq;
-    totalNeto += netoLiq;
+    // conceptos de sección débito
+    const debArancel = findConcept(liq?.tit2?.cuadro, "ARANCEL DE DESCUENTO");
+    const debIVA = findConcept(liq?.tit2?.cuadro, "IVA S/ARANCEL");
+
+    // ------------------ Sección Crédito (tit4) -----------------
+    const creCant = num(liq?.tit4?.totalVentas?.cantidad);
+    const creTotal = num(liq?.tit4?.totalVentas?.total);
+
+    // conceptos de sección crédito
+    const creArancel = findConcept(liq?.tit4?.cuadro, "ARANCEL DE DESCUENTO");
+    const creIVA = findConcept(liq?.tit4?.cuadro, "IVA S/ARANCEL");
+
+    // ------------------ Tot. Fecha Pago (tit5) -----------------
+    const totFechaPago = num(liq?.tit5?.totFechaPago?.total);
+
+    // conceptos finales (tit5.cuadro)
+    const finArancelTotal = findConcept(liq?.tit5?.cuadro, "ARANCEL DE DESCUENTO"); // (TOTAL)
+    const finIVACosto = findConcept(liq?.tit5?.cuadro, "IVA S/ARANCEL + COSTO FINANCIERO");
+    const finNeto = findConcept(liq?.tit5?.cuadro, "NETO A LIQUIDAR");
+    const finPercep = findConcept(liq?.tit5?.cuadro, "PERCEPCION DE IIBB");
+    const finRetSirtac = findConcept(liq?.tit5?.cuadro, "RETENCION IIBB SIRTAC");
+    const finImporteFinal = num(liq?.tit5?.totalFinal);
+
+    const row = [
+      liq?.encabezado?.liquidacionNro || "",
+      liq?.encabezado?.fechaPago || "",
+      liq?.encabezado?.cuenta || "",
+      debCant,         // D
+      debTotal,        // E
+      debArancel,      // F
+      debIVA,          // G
+      creCant,         // H
+      creTotal,        // I
+      creArancel,      // J
+      creIVA,          // K
+      totFechaPago,    // L
+      finArancelTotal, // M
+      finIVACosto,     // N
+      finNeto,         // O
+      finPercep,       // P
+      finRetSirtac,    // Q
+      finImporteFinal  // R
+    ];
+
+    data.push(row);
+
+    // Acumular totales (desde la col D=3 hasta R=17 del array zero-based)
+    for (let c = 3; c < headers.length; c++) {
+      totals[c] += num(row[c]);
+    }
   });
 
-  // Agregar totales
-  wsData.push([]);
-  wsData.push(["TOTALES", "", "", totalDebito, totalCredito, totalNeto]);
+  // Fila de totales
+  data.push([]);
+  const totalRow = new Array(headers.length).fill("");
+  totalRow[0] = "TOTALES";
+  for (let c = 3; c < headers.length; c++) totalRow[c] = totals[c];
+  data.push(totalRow);
 
-  // Crear la hoja
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  // Crear libro y hoja
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
   XLSX.utils.book_append_sheet(wb, ws, "Totalizador");
 
-  // Descargar el archivo
-  const fecha = new Date().toISOString().split('T')[0];
+  // Anchos de columnas
+  ws["!cols"] = [
+    { wch: 14 }, // A
+    { wch: 12 }, // B
+    { wch: 26 }, // C
+    { wch: 10 }, // D
+    { wch: 14 }, // E
+    { wch: 14 }, // F
+    { wch: 14 }, // G
+    { wch: 10 }, // H
+    { wch: 14 }, // I
+    { wch: 14 }, // J
+    { wch: 14 }, // K
+    { wch: 16 }, // L
+    { wch: 14 }, // M
+    { wch: 18 }, // N
+    { wch: 16 }, // O
+    { wch: 16 }, // P
+    { wch: 18 }, // Q
+    { wch: 18 }  // R
+  ];
+
+  // Formatear como número/moneda las columnas D..R (excepto A..C)
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  for (let R = 3; R <= range.e.r; R++) { // desde fila de headers (index 2) + 1
+    for (let C = 3; C <= 17; C++) {      // D (3) .. R (17) zero-based
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = ws[addr];
+      if (!cell) continue;
+      if (typeof cell.v === "number") {
+        cell.t = "n";
+        // Moneda con negativos en rojo
+        cell.z = '"$"#,##0.00;[Red]"$"#,##0.00';
+      }
+    }
+  }
+
+  // Descargar archivo
+  const fecha = new Date().toISOString().split("T")[0];
   XLSX.writeFile(wb, `Totalizador_CABAL_${fecha}.xlsx`);
 }
