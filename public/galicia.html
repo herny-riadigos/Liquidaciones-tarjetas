@@ -19,19 +19,24 @@
         <h2 class="main-title">Liquidación Galicia</h2>
 
         <div class="content-card">
-            <label>Pegá la liquidación completa:</label>
-            <textarea id="textogalicia" placeholder="Pegá acá la liquidación Galicia..." rows="14"></textarea>
 
-            <button id="btnProcesargalicia" class="btn-accion">Procesar Liquidación</button>
+            <label for="fileGalicia">Seleccioná el archivo Excel de Galicia:</label>
+            <input type="file" id="fileGalicia" accept=".xlsx,.xls" class="file-input">
+
+            <button id="btnProcesarGalicia" class="btn-accion">Procesar Archivo</button>
+
         </div>
 
         <a href="index.html" class="btn-volver">⬅ Volver al menú</a>
 
     </main>
 
-    <!-- librería Excel -->
+    <!-- Librería Excel -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Lógica de esta página -->
     <script src="js/galicia.js"></script>
+    <script src="js/xlsx.full.min.js"></script>
     <script src="js/utilidades.js"></script>
 
 </body>

@@ -10,28 +10,39 @@
 
 <body>
 
+    <!-- Título superior derecho -->
     <header class="header-top">
         <h1 class="logo-title">Riadigos*</h1>
     </header>
 
+    <!-- Contenido principal -->
     <main class="main-container">
 
         <h2 class="main-title">Liquidación Mercado Pago</h2>
 
         <div class="content-card">
-            <label>Pegá la liquidación completa:</label>
-            <textarea id="textomercadopago" placeholder="Pegá acá la liquidación Mercado Pago..." rows="14"></textarea>
 
-            <button id="btnProcesarmercadopago" class="btn-accion">Procesar Liquidación</button>
+            <label for="fileMP">Seleccioná el archivo de Mercado Pago:</label>
+
+            <!-- Mercado Pago descarga XLSX o CSV -->
+            <input type="file" id="fileMP" accept=".xlsx,.xls,.csv" class="file-input">
+
+            <button id="btnProcesarMP" class="btn-accion">
+                Procesar Archivo
+            </button>
+
         </div>
 
         <a href="index.html" class="btn-volver">⬅ Volver al menú</a>
 
     </main>
 
-    <!-- librería Excel -->
+    <!-- Librería Excel (SheetJS con estilos) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-    <script src="js/mp.js"></script>
+
+    <!-- Archivo JS de Mercado Pago (lo crearemos después) -->
+    <script src="js/mercadopago.js"></script>
+    <script src="js/xlsx.full.min.js"></script>
     <script src="js/utilidades.js"></script>
 
 </body>
