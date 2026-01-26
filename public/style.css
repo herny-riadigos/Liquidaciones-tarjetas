@@ -102,7 +102,7 @@ body {
   margin: 0 auto 40px auto;
   padding: 30px;
   border-radius: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   text-align: center;
   font-size: 18px;
   color: #333;
@@ -120,6 +120,8 @@ body {
   font-size: 18px;
   border-radius: 10px;
   transition: 0.25s;
+  margin-top: 25px;
+
 }
 
 .btn-volver:hover {
@@ -143,7 +145,7 @@ body {
   background: white;
   padding: 20px;
   border-radius: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .paste-area label {
@@ -166,7 +168,7 @@ body {
   background: white;
   padding: 20px;
   border-radius: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .lista-area h3 {
@@ -224,11 +226,36 @@ body {
 
 /* Corrección para Nación */
 .content-card {
-    max-width: 600px;
-    margin: 0 auto;
-    display: block;
+  max-width: 600px;
+  margin: 0 auto;
+  display: block;
 }
 
 .content-card textarea {
-    width: 100%;
+  width: 100%;
+}
+
+/* ============================
+   Logo de tarjeta en el header
+   ============================ */
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Riadigos a la derecha */
+  padding: 10px 20px;
+}
+
+.logo-tarjeta {
+  height: 80px;
+  /* Ajusta si querés más grande */
+  width: auto;
+  object-fit: contain;
+}
+
+/* Ajuste especial para un logo específico */
+.logo-bna {
+  height: 80px;
+  /* probá 45 / 50 / 60 hasta que quede perfecto */
 }
