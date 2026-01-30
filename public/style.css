@@ -259,3 +259,91 @@ body {
   height: 80px;
   /* probá 45 / 50 / 60 hasta que quede perfecto */
 }
+/* ============================================================
+   CABAL – Lista de liquidaciones procesadas (sin Bootstrap)
+   ============================================================ */
+
+/* Contenedor derecho */
+.lista-area {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+}
+
+/* Título del panel */
+.lista-area h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #123b52; /* azul oscuro */
+}
+
+/* UL sin viñetas */
+#listaProcesadas {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  /* si hay muchas liqs, scrollea */
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+/* Items (usas list-group-item en JS, lo estilizamos acá) */
+#listaProcesadas .list-group-item {
+  display: flex;                 /* reemplaza d-flex */
+  justify-content: space-between;/* reemplaza justify-content-between */
+  align-items: center;           /* reemplaza align-items-center */
+
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.75);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hover sutil */
+#listaProcesadas .list-group-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
+
+/* Texto principal (el primer span que agregás con info) */
+#listaProcesadas .list-group-item span:first-child {
+  font-weight: 650;
+  font-size: 14px;
+  color: #123b52;
+}
+
+/* Badge (usas badge bg-success rounded-pill en JS, lo estilizamos) */
+#listaProcesadas .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 6px 10px;
+  border-radius: 999px; /* reemplaza rounded-pill */
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--verde-riadigos); /* reemplaza bg-success */
+}
+
+/* Si querés que el scroll se vea más lindo (opcional) */
+#listaProcesadas::-webkit-scrollbar {
+  width: 8px;
+}
+#listaProcesadas::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.18);
+  border-radius: 999px;
+}
+#listaProcesadas::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -456,219 +456,207 @@ function parsearLiquidacionCabal(textoOriginal) {
    ============================================================ */
 
 function generarExcelCabal(datos, nombreArchivo) {
-  // Crear un nuevo libro de trabajo
   const wb = XLSX.utils.book_new();
-
-  // Crearemos la hoja manualmente para controlar el formato
   const ws = {};
+  const merges = [];
+  ws["!merges"] = merges;
 
-  // Configuración de ancho de columnas
-  const wscols = [
-    { wch: 30 }, // Columna A
-    { wch: 10 }, // Columna B  
-    { wch: 15 }, // Columna C
-    { wch: 20 }, // Columna D
-    { wch: 20 }  // Columna E
+  // Columnas (las tuyas)
+  ws["!cols"] = [
+    { wch: 34 }, // A
+    { wch: 14 }, // B
+    { wch: 18 }, // C
+    { wch: 18 }, // D
+    { wch: 18 }  // E
   ];
 
-  // Función para agregar celda con formato
-  function agregarCelda(col, row, valor, esNumero = false, esMoneda = false) {
-    const celda = XLSX.utils.encode_cell({ c: col, r: row });
+  const BORDER = {
+    top:    { style: "thin", color: { rgb: "D0D0D0" } },
+    bottom: { style: "thin", color: { rgb: "D0D0D0" } },
+    left:   { style: "thin", color: { rgb: "D0D0D0" } },
+    right:  { style: "thin", color: { rgb: "D0D0D0" } }
+  };
 
-    if (esNumero) {
-      // Convertir a número
-      const numValor = typeof valor === 'string' ? parseFloat(valor) : valor;
-      ws[celda] = {
-        v: numValor,
-        t: 'n'
-      };
+  const ST = {
+    title:  { font: { bold: true, sz: 12 }, alignment: { horizontal: "center", vertical: "center" }, border: BORDER },
+    head:   { font: { bold: true }, alignment: { horizontal: "center", vertical: "center" }, border: BORDER },
+    label:  { font: { bold: true }, alignment: { horizontal: "left", vertical: "center" }, border: BORDER },
+    text:   { alignment: { horizontal: "left", vertical: "center" }, border: BORDER },
+    num:    { alignment: { horizontal: "right", vertical: "center" }, border: BORDER },
+    money:  { alignment: { horizontal: "right", vertical: "center" }, border: BORDER }
+  };
 
-      if (esMoneda) {
-        // Formato de moneda argentina
-        ws[celda].z = '"$"#,##0.00;[Red]"$"#,##0.00';
+  let r = 0; // fila 0-based
+
+  const setCell = (c, rr, v, t = "s", s = ST.text, z = undefined) => {
+    const addr = XLSX.utils.encode_cell({ c, r: rr });
+    ws[addr] = { v, t };
+    if (z) ws[addr].z = z;
+    ws[addr].s = s;
+  };
+
+  const addBlank = () => { r++; };
+
+  const addSectionTitle = (txt) => {
+    // Merge A..E en la fila r
+    merges.push({ s: { r, c: 0 }, e: { r, c: 4 } });
+    for (let c = 0; c <= 4; c++) setCell(c, r, c === 0 ? txt : "", "s", ST.title);
+    r++;
+  };
+
+  const addKV = (k, v) => {
+    setCell(0, r, k, "s", ST.label);
+    setCell(1, r, v ?? "", "s", ST.text);
+    // borde suave “vacío” a la derecha para prolijidad
+    for (let c = 2; c <= 4; c++) setCell(c, r, "", "s", ST.text);
+    r++;
+  };
+
+  const addHeaderRow = (arr) => {
+    arr.forEach((val, c) => setCell(c, r, val, "s", ST.head));
+    // completar hasta col E si viene más corto
+    for (let c = arr.length; c <= 4; c++) setCell(c, r, "", "s", ST.head);
+    r++;
+  };
+
+  const addDataRow = (arr, moneyColIdx = null) => {
+    for (let c = 0; c <= 4; c++) {
+      const v = arr[c] ?? "";
+      // IMPORTANTE: si es string, lo forzamos texto (para no perder ceros a la izquierda)
+      if (typeof v === "number") {
+        const isMoney = (moneyColIdx === c);
+        setCell(c, r, v, "n", isMoney ? ST.money : ST.num, isMoney ? '"$"#,##0.00;[Red]"$"#,##0.00' : "#,##0.00");
       } else {
-        // Formato numérico estándar
-        ws[celda].z = '#,##0.00';
+        setCell(c, r, String(v), "s", ST.text);
       }
-    } else {
-      // Texto normal
-      ws[celda] = { v: valor, t: 's' };
     }
+    r++;
+  };
+
+  /* =======================
+     ENCABEZADO
+     ======================= */
+  addSectionTitle("ENCABEZADO DE LIQUIDACIÓN");
+  addKV("FECHA DE PAGO", datos?.encabezado?.fechaPago || "");
+  addKV("NRO. LIQUIDACIÓN", datos?.encabezado?.liquidacionNro || "");
+  addKV("CUENTA", datos?.encabezado?.cuenta || "");
+  addBlank();
+
+  /* =======================
+     TIT 1 - DÉBITO CUADRO 1
+     ======================= */
+  if (datos?.tit1?.cuadro1?.length) {
+    addSectionTitle("VENTAS CABAL DÉBITO — DETALLE");
+    addHeaderRow(["FECHA", "NRO CUPÓN", "NRO TARJETA", "CUOTA", "IMPORTE"]);
+    datos.tit1.cuadro1.forEach(it => {
+      addDataRow([it.fecha, it.nroCupon, it.nroTarjeta, it.cuota, it.importe], 4);
+    });
+    addBlank();
   }
 
-  // Función para agregar fila
-  function agregarFila(fila, valores) {
-    valores.forEach((valor, col) => {
-      // Determinar si es número
-      const esNumero = typeof valor === 'number';
-      const esMoneda = esNumero; // Todos los números serán moneda por ahora
-      agregarCelda(col, fila, valor, esNumero, esMoneda);
+  /* =======================
+     TIT 1 - DÉBITO CUADRO 2
+     ======================= */
+  if (datos?.tit1?.cuadro2?.length) {
+    addSectionTitle("VENTAS CABAL DÉBITO — TOTALES POR TERMINAL");
+    addHeaderRow(["FECHA", "LOTE", "TERMINAL", "CANTIDAD", "TOTAL"]);
+    datos.tit1.cuadro2.forEach(it => {
+      addDataRow([it.fecha, it.lote, it.terminal, it.cantidad, it.total], 4);
+    });
+    addBlank();
+  }
+
+  /* =======================
+     TIT 2 - RESUMEN DÉBITO
+     ======================= */
+  addSectionTitle("CABAL DÉBITO — RESUMEN");
+  addHeaderRow(["", "CANTIDAD", "", "", "TOTAL"]);
+  addDataRow(["TOTAL DE VENTAS", datos?.tit2?.totalVentas?.cantidad ?? 0, "", "", datos?.tit2?.totalVentas?.total ?? 0], 4);
+
+  if (datos?.tit2?.cuadro?.length) {
+    addBlank();
+    addHeaderRow(["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
+    datos.tit2.cuadro.forEach(it => {
+      addDataRow([it.concepto, it.porc || "", it.referencia || "", "", it.importe || 0], 4);
     });
   }
+  addBlank();
 
-  let filaActual = 0;
-
-  // ENCABEZADO
-  agregarFila(filaActual++, ["ENCABEZADO DE LIQUIDACIÓN"]);
-  agregarFila(filaActual++, ["FECHA DE PAGO:", datos.encabezado.fechaPago]);
-  agregarFila(filaActual++, ["NRO. LIQUIDACIÓN:", datos.encabezado.liquidacionNro]);
-  agregarFila(filaActual++, ["CUENTA:", datos.encabezado.cuenta]);
-  filaActual++; // Línea vacía
-
-  // TÍTULO 1: VENTAS CABAL DÉBITO - CUADRO 1
-  if (datos.tit1.cuadro1.length > 0) {
-    agregarFila(filaActual++, ["VENTAS CORRESPONDIENTES A CABAL DÉBITO - DETALLE"]);
-    agregarFila(filaActual++, ["FECHA", "NRO CUPÓN", "NRO TARJETA", "CUOTA", "IMPORTE"]);
-
-    datos.tit1.cuadro1.forEach(item => {
-      agregarFila(filaActual++, [
-        item.fecha,
-        item.nroCupon,
-        item.nroTarjeta,
-        item.cuota,
-        item.importe
-      ]);
+  /* =======================
+     TIT 3 - CRÉDITO CUADRO 1
+     ======================= */
+  if (datos?.tit3?.cuadro1?.length) {
+    addSectionTitle("VENTAS TARJETA CRÉDITO — DETALLE");
+    addHeaderRow(["FECHA", "NRO CUPÓN", "NRO TARJETA", "CUOTA", "IMPORTE"]);
+    datos.tit3.cuadro1.forEach(it => {
+      addDataRow([it.fecha, it.nroCupon, it.nroTarjeta, it.cuota, it.importe], 4);
     });
-    filaActual++;
+    addBlank();
   }
 
-  // TÍTULO 1: VENTAS CABAL DÉBITO - CUADRO 2
-  if (datos.tit1.cuadro2.length > 0) {
-    agregarFila(filaActual++, ["VENTAS CORRESPONDIENTES A CABAL DÉBITO - TOTALES POR TERMINAL"]);
-    agregarFila(filaActual++, ["FECHA", "LOTE", "TERMINAL", "CANTIDAD", "TOTAL"]);
-
-    datos.tit1.cuadro2.forEach(item => {
-      agregarFila(filaActual++, [
-        item.fecha,
-        item.lote,
-        item.terminal,
-        item.cantidad,
-        item.total
-      ]);
+  /* =======================
+     TIT 3 - CRÉDITO CUADRO 2
+     ======================= */
+  if (datos?.tit3?.cuadro2?.length) {
+    addSectionTitle("VENTAS TARJETA CRÉDITO — TOTALES POR TERMINAL");
+    addHeaderRow(["FECHA", "LOTE", "TERMINAL", "CANTIDAD", "TOTAL"]);
+    datos.tit3.cuadro2.forEach(it => {
+      addDataRow([it.fecha, it.lote, it.terminal, it.cantidad, it.total], 4);
     });
-    filaActual++;
+    addBlank();
   }
 
-  // TÍTULO 2: CABAL DÉBITO TOTALES
-  agregarFila(filaActual++, ["CABAL DÉBITO - RESUMEN"]);
-  agregarFila(filaActual++, ["TOTAL VENTAS:", `Cantidad: ${datos.tit2.totalVentas.cantidad || 0}`, `Importe:`, "", datos.tit2.totalVentas.total || 0]);
+  /* =======================
+     TIT 4 - RESUMEN CRÉDITO
+     ======================= */
+  addSectionTitle("TARJETA CRÉDITO — RESUMEN");
+  addHeaderRow(["", "CANTIDAD", "", "", "TOTAL"]);
+  addDataRow(["TOTAL DE VENTAS", datos?.tit4?.totalVentas?.cantidad ?? 0, "", "", datos?.tit4?.totalVentas?.total ?? 0], 4);
 
-  if (datos.tit2.cuadro.length > 0) {
-    filaActual++;
-    agregarFila(filaActual++, ["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
-
-    datos.tit2.cuadro.forEach(item => {
-      agregarFila(filaActual++, [
-        item.concepto,
-        item.porc,
-        item.referencia,
-        "",
-        item.importe
-      ]);
+  if (datos?.tit4?.cuadro?.length) {
+    addBlank();
+    addHeaderRow(["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
+    datos.tit4.cuadro.forEach(it => {
+      addDataRow([it.concepto, it.porc || "", it.referencia || "", "", it.importe || 0], 4);
     });
   }
-  filaActual++;
+  addBlank();
 
-  // TÍTULO 3: VENTAS TARJETA CRÉDITO - CUADRO 1
-  if (datos.tit3.cuadro1.length > 0) {
-    agregarFila(filaActual++, ["VENTAS TARJETA DE CRÉDITO - DETALLE"]);
-    agregarFila(filaActual++, ["FECHA", "NRO CUPÓN", "NRO TARJETA", "CUOTA", "IMPORTE"]);
+  /* =======================
+     TIT 5 - TOT FEC PAGO
+     ======================= */
+  if (datos?.tit5?.totFechaPago?.fecha) {
+    addSectionTitle("TOTAL FECHA DE PAGO");
+    addKV("FECHA", datos.tit5.totFechaPago.fecha);
+    addKV("CANTIDAD", String(datos.tit5.totFechaPago.cantidad ?? 0));
+    addKV("TOTAL", ""); // dejamos label lindo
+    // total en col E
+    setCell(4, r - 1, datos.tit5.totFechaPago.total ?? 0, "n", ST.money, '"$"#,##0.00;[Red]"$"#,##0.00');
+    addBlank();
+  }
 
-    datos.tit3.cuadro1.forEach(item => {
-      agregarFila(filaActual++, [
-        item.fecha,
-        item.nroCupon,
-        item.nroTarjeta,
-        item.cuota,
-        item.importe
-      ]);
+  if (datos?.tit5?.cuadro?.length) {
+    addSectionTitle("CONCEPTOS FINALES");
+    addHeaderRow(["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
+    datos.tit5.cuadro.forEach(it => {
+      addDataRow([it.concepto, it.porc || "", it.referencia || "", "", it.importe || 0], 4);
     });
-    filaActual++;
+    addBlank();
   }
 
-  // TÍTULO 3: VENTAS TARJETA CRÉDITO - CUADRO 2
-  if (datos.tit3.cuadro2.length > 0) {
-    agregarFila(filaActual++, ["VENTAS TARJETA DE CRÉDITO - TOTALES POR TERMINAL"]);
-    agregarFila(filaActual++, ["FECHA", "LOTE", "TERMINAL", "CANTIDAD", "TOTAL"]);
-
-    datos.tit3.cuadro2.forEach(item => {
-      agregarFila(filaActual++, [
-        item.fecha,
-        item.lote,
-        item.terminal,
-        item.cantidad,
-        item.total
-      ]);
-    });
-    filaActual++;
+  if (datos?.tit5?.totalFinal) {
+    addSectionTitle("IMPORTE NETO FINAL A LIQUIDAR");
+    addHeaderRow(["", "", "", "", "IMPORTE"]);
+    addDataRow(["", "", "", "", datos.tit5.totalFinal], 4);
   }
 
-  // TÍTULO 4: TARJETA CRÉDITO TOTALES
-  agregarFila(filaActual++, ["TARJETA DE CRÉDITO - RESUMEN"]);
-  agregarFila(filaActual++, ["TOTAL VENTAS:", `Cantidad: ${datos.tit4.totalVentas.cantidad || 0}`, `Importe:`, "", datos.tit4.totalVentas.total || 0]);
+  // Ref final
+  ws["!ref"] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 4, r: Math.max(0, r - 1) } });
 
-  if (datos.tit4.cuadro.length > 0) {
-    filaActual++;
-    agregarFila(filaActual++, ["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
-
-    datos.tit4.cuadro.forEach(item => {
-      agregarFila(filaActual++, [
-        item.concepto,
-        item.porc,
-        item.referencia,
-        "",
-        item.importe
-      ]);
-    });
-  }
-  filaActual++;
-
-  // TÍTULO 5: TOT FEC PAGO
-  if (datos.tit5.totFechaPago.fecha) {
-    agregarFila(filaActual++, ["TOTAL FECHA DE PAGO"]);
-    agregarFila(filaActual++, ["FECHA:", datos.tit5.totFechaPago.fecha]);
-    agregarFila(filaActual++, ["CANTIDAD:", datos.tit5.totFechaPago.cantidad]);
-    agregarFila(filaActual++, ["TOTAL:", "", "", "", datos.tit5.totFechaPago.total]);
-    filaActual++;
-  }
-
-  // TÍTULO 5: CUADRO FINAL (SOLO CONCEPTOS FINALES)
-  if (datos.tit5.cuadro.length > 0) {
-    agregarFila(filaActual++, ["CONCEPTOS FINALES"]);
-    agregarFila(filaActual++, ["CONCEPTO", "%", "REFERENCIA", "", "IMPORTE"]);
-
-    datos.tit5.cuadro.forEach(item => {
-      agregarFila(filaActual++, [
-        item.concepto,
-        item.porc,
-        item.referencia,
-        "",
-        item.importe
-      ]);
-    });
-    filaActual++;
-  }
-
-  // IMPORTE NETO FINAL
-  if (datos.tit5.totalFinal) {
-    agregarFila(filaActual++, ["IMPORTE NETO FINAL A LIQUIDAR"]);
-    agregarFila(filaActual++, ["IMPORTE:", "", "", "", datos.tit5.totalFinal]);
-  }
-
-  // Definir el rango de la hoja
-  const range = { s: { c: 0, r: 0 }, e: { c: 4, r: filaActual } };
-  ws['!ref'] = XLSX.utils.encode_range(range);
-  ws['!cols'] = wscols;
-
-  // Agregar la hoja al libro
   XLSX.utils.book_append_sheet(wb, ws, "Liquidación");
-
-  // Descargar el archivo
-  const nombreFinal = `${nombreArchivo || "liquidacion_cabal"}.xlsx`;
-  XLSX.writeFile(wb, nombreFinal);
-
-  return nombreFinal;
+  XLSX.writeFile(wb, `${nombreArchivo || "liquidacion_cabal"}.xlsx`);
 }
+
 
 /* ============================================================
    PARTE 3 - INTEGRACIÓN CON LA INTERFAZ
